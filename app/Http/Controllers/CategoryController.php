@@ -2,57 +2,68 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Services\BaseCrudController;
 use App\Models\Category;
 use Illuminate\Http\Request;
-use Faker\Factory as Faker;
+use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
-class CategoryController extends Controller
+class CategoryController extends BaseCrudController
 {
-    // --- GetAll /api/categories
-    public function getCategories(){
-       $categories = Category::all();
+    protected $model = Category::class;
+    public function getAll(Request $request)
+    {
+        try {
+            $perPage = $request->query('per_page', 10);
+            $items = $this->model::with(['user' => function ($query) {
+                $query->select('id', 'name');
+            }])->paginate($perPage);
 
-       return view('showcat',['c' => $categories]);
-        // return $categories;
+            return response()->json($items, Response::HTTP_OK);
+        } catch (ValidationException $e) {
+            return $this->handleValidationException($e);
+        } catch (\Exception $e) {
+            return $this->handleUnexpectedException($e);
+        }
     }
-
-    // --- Post /api/categories
-    public function createCategories(){
-        $name = Faker::create();
-
-        $category = new Category([
-            'name' => $name->name
-        ]);
-        $category->save();
-
-        return view('showcat',['c'=> Category::all()]);
+    public function create(Request $request)
+    {
+        try {
+            $request->validate([
+                'name' => ['required', 'string', Rule::unique('categories')],
+                'description' => 'nullable|string',
+                'parent_id' => 'nullable',
+            ]);
+            $data = $request->all();
+            $data['modified_by'] = $this->getCurrentUserId();
+            $item = $this->model::create($data);
+            return response()->json($item, Response::HTTP_CREATED);
+        } catch (ValidationException $e) {
+            return $this->handleValidationException($e);
+        } catch (\Exception $e) {
+            return $this->handleUnexpectedException($e);
+        }
     }
-
-    // --- Get /api/categories/{categoryId}
-    public function getCategory($categoryId){
-        $categories[] = Category::find($categoryId);
-
-        return view('showcat',['c'=> $categories]);
-        // return $categories;
+    public function update(Request $request, $id)
+    {
+        try {
+            $item = $this->model::find($id);
+            if (!$item) {
+                return response()->json(['message' => $this->getModelName() . ' not found'], Response::HTTP_NOT_FOUND);
+            }
+            $data = $request->validate([
+                'name' => ['required', 'string', Rule::unique('categories')->ignore($id)],
+                'description' => 'nullable|string',
+                'parent_id' => 'nullable',
+            ]);
+            $data['modified_by'] = $this->getCurrentUserId();
+            $item->update($data);
+            return response()->json($item, Response::HTTP_OK);
+        } catch (ValidationException $e) {
+            return $this->handleValidationException($e);
+        } catch (\Exception $e) {
+            return $this->handleUnexpectedException($e);
+        }
     }
-
-    // --- Patch /api/categories/{categoryId}
-    public function updateCategory($categoryId){
-        $category[] = Category::find($categoryId);
-
-        $category[0]->name = 'ChangedName';
-        $category[0]->save();
-
-        return view('showcat',['c'=> $category]);
-    }
-
-    // --- Delete /api/categories/{categoryId}
-    public function deleteCategory($categoryId){
-        $category = Category::find($categoryId);
-
-        $category->delete();
-        return view('showcat',['c'=> Category::all()]);
-    }
-
-
 }

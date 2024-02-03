@@ -1,7 +1,6 @@
 <?php
 
-use App\Http\Controllers\CategoryController;
-use App\Http\Controllers\ProductController;
+use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -16,35 +15,9 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+
+
+// ===> Manage route
+Route::group(['prefix' => 'v1'], function () {
+    require(__DIR__ . '/api/main.php');
 });
-
-// Route::get('/categories', function (Request $request) {
-//     return "Get all categories";
-// });
-// Route::post('/categories', function (Request $request) {
-//     return "Create 1 categories";
-// });
-// Route::patch('/categories/{categoryId}', function (Request $request) {
-//     return "Update 1 categories";
-// });
-// Route::delete('/categories/{categoryId}', function (Request $request) {
-//     return "Delete 1 categories";
-// });
-
-// Route::get('/products', function (Request $request) {
-//     return "Get all products";
-// });
-// Route::post('/products', function (Request $request) {
-//     return "Create 1 product";
-// });
-// Route::patch('/products/{productId}', function (Request $request) {
-//     return "Update 1 product";
-// });
-// Route::delete('/products/{productId}', function (Request $request) {
-//     return "Delete 1 product";
-// });
-// Route::get('/categories/{categoryId}/products', function (Request $request) {
-//     return "Get all products belong to categoryId";
-// });

@@ -1,31 +1,22 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Services;
 
-use App\Http\Controllers\Services\BaseCrudController;
-use App\Http\Controllers\Services\FileUploadController;
-use App\Models\Product;
-use App\Models\Category;
-use Illuminate\Http\Response;
-use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
-class ProductController extends BaseCrudController
+class BaseCrudController extends Controller
 {
-    protected $model = Product::class;
+    protected $model;
 
     public function getAll(Request $request)
     {
         try {
-            if ($request->has('category')) {
-                $categoryId = $request->query('category');
-                $perPage = $request->query('per_page', 9);
-                $items = $this->model::where('category_id', $categoryId)->paginate($perPage);
-            } else {
-                $perPage = $request->query('per_page', 9);
-                $items = $this->model::paginate($perPage);
-            }
+            $perPage = $request->query('per_page', 10);
+            $items = $this->model::paginate($perPage);
 
             return response()->json($items, Response::HTTP_OK);
         } catch (ValidationException $e) {
@@ -35,24 +26,11 @@ class ProductController extends BaseCrudController
         }
     }
 
-
-    public function getPromotion(Request $request)
-    {
-        try {
-            $items = Product::where('status', 'promotion')->get();
-
-            return response()->json($items, Response::HTTP_OK);
-        } catch (ValidationException $e) {
-            return $this->handleValidationException($e);
-        } catch (\Exception $e) {
-            return $this->handleUnexpectedException($e);
-        }
-    }
 
     public function getById($id)
     {
         try {
-            $item = Product::with('images')->find($id);
+            $item = $this->model::find($id);
             if (!$item) {
                 return response()->json(['message' => $this->getModelName() . ' not found'], Response::HTTP_NOT_FOUND);
             }
@@ -64,9 +42,93 @@ class ProductController extends BaseCrudController
         }
     }
 
+
+    public function delete($id)
+    {
+        try {
+            $item = $this->model::find($id);
+
+            if (!$item) {
+                return response()->json(['message' => $this->getModelName() . ' not found'], Response::HTTP_NOT_FOUND);
+            }
+
+            $item->delete();
+
+            return response()->json(['message' => $this->getModelName() . ' deleted successfully'], Response::HTTP_OK);
+        } catch (ValidationException $e) {
+            return $this->handleValidationException($e);
+        } catch (\Exception $e) {
+            return $this->handleUnexpectedException($e);
+        }
+    }
+
+    protected function handleValidationException(ValidationException $e)
+    {
+        return response()->json([
+            'message' => 'Validation Error',
+            'errors' => $e->errors(),
+        ], Response::HTTP_BAD_REQUEST);
+    }
+
+    protected function handleUnexpectedException(\Exception $e)
+    {
+        return response()->json([
+            'message' => 'Server Error',
+        ], Response::HTTP_INTERNAL_SERVER_ERROR);
+    }
+
+    protected function getModelName()
+    {
+        return class_basename($this->model);
+    }
+
+    protected function getCurrentUserId()
+    {
+        return Auth::id();
+    }
+}
+
+/*
+
     public function create(Request $request)
     {
-        // return $request->all();
+        try {
+            $request->validate([
+                'name' => ['required', 'string', Rule::unique('colors')],
+                'description' => 'nullable|string',
+            ]);
+            $data = $request->all();
+            $data['modified_by'] = $this->getCurrentUserId();
+            $item = $this->model::create($data);
+            return response()->json($item, Response::HTTP_CREATED);
+        } catch (ValidationException $e) {
+            return $this->handleValidationException($e);
+        } catch (\Exception $e) {
+            return $this->handleUnexpectedException($e);
+        }
+    }
+    public function update(Request $request, $id)
+    {
+        try {
+            $item = $this->model::find($id);
+            if (!$item) {
+                return response()->json(['message' => $this->getModelName() . ' not found'], Response::HTTP_NOT_FOUND);
+            }
+            $data = $request->validate([
+                'name' => ['required', 'string', Rule::unique('colors')->ignore($id)],
+                'description' => 'nullable|string',
+            ]);
+            $data['modified_by'] = $this->getCurrentUserId();
+            $item->update($data);
+            return response()->json($item, Response::HTTP_OK);
+        } catch (ValidationException $e) {
+            return $this->handleValidationException($e);
+        } catch (\Exception $e) {
+            return $this->handleUnexpectedException($e);
+        }
+    }
+    public function create(Request $request)
+    {
         try {
             $request->validate([
                 'name' => 'required|string',
@@ -75,25 +137,15 @@ class ProductController extends BaseCrudController
                 'category_id' => 'required',
                 'discount' => 'nullable|string',
                 'tags' => 'nullable|string',
-                'sku' => 'nullable|string',
-                'status' => 'nullable|string',
-                'product_detail' => 'required|string',
                 'additional_information' => 'nullable|string',
                 'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'images' => 'required|array',
                 'images.*' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'quantity' => 'required|integer|min:0'
             ]);
 
             DB::beginTransaction();
 
             try {
-                $IsCategoryId = Category::find($request->category_id);
-                if (!$IsCategoryId) {
-                    return response()->json([
-                        'message' => 'category_id not found!'
-                    ], Response::HTTP_BAD_REQUEST);
-                }
                 $data = $request->all();
                 $image = FileUploadController::storeImage($request->file('image'), 'uploads/products');
                 $data['image'] = $image;
@@ -119,10 +171,11 @@ class ProductController extends BaseCrudController
             return $this->handleUnexpectedException($e);
         }
     }
+    :::::::::::::::::::::::::>>=====================<<:::::::::::::::::::::::::
+    create and update with upload single image or multiple images
+    :::::::::::::::::::::::::>>=====================<<:::::::::::::::::::::::::
     public function update(Request $request, $id)
     {
-        // return $id;
-        // return $request->all();
         try {
             $request->validate([
                 'name' => 'required|string',
@@ -131,24 +184,15 @@ class ProductController extends BaseCrudController
                 'category_id' => 'required',
                 'discount' => 'nullable|string',
                 'tags' => 'nullable|string',
-                'sku' => 'nullable|string',
-                'product_detail' => 'required|string',
                 'additional_information' => 'nullable|string',
                 'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
                 'images' => 'nullable|array',
                 'images.*' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'quantity' => 'required|integer|min:0'
             ]);
 
             DB::beginTransaction();
 
             try {
-                $IsCategoryId = Category::find($request->category_id);
-                if (!$IsCategoryId) {
-                    return response()->json([
-                        'message' => 'category_id not found!'
-                    ], Response::HTTP_BAD_REQUEST);
-                }
                 $item = Product::with('images')->find($id);
                 if (!$item) {
                     return response()->json(['message' => $this->getModelName() . ' not found'], Response::HTTP_NOT_FOUND);
@@ -184,4 +228,4 @@ class ProductController extends BaseCrudController
             return $this->handleUnexpectedException($e);
         }
     }
-}
+    */
