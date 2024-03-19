@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -15,9 +14,6 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-
-
-// ===> Manage route
-Route::group(['prefix' => 'v1'], function () {
-    require(__DIR__ . '/api/main.php');
+Route::middleware('auth:api')->get('/user', function (Request $request) {
+    return "Hello";
 });
